@@ -1,0 +1,9 @@
+name: instana
+version: 0.1.0
+
+authors:
+  - Peter Giacomo Lombardo <pglombardo@gmail.com>
+
+crystal: 0.20.4
+
+license: MIT
