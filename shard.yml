@@ -7,3 +7,8 @@ authors:
 crystal: 0.20.4
 
 license: MIT
+
+dependencies:
+  quartz:
+    github: andrewhamon/quartz
+    version: ~> 0.1.1
