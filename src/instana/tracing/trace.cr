@@ -1,6 +1,7 @@
 module Instana
   class Trace
     # @return [Integer] the ID for this trace
+    @id : Int64
     property :id
 
     # The collection of `Span` for this trace
@@ -83,14 +84,14 @@ module Instana
       span ||= @current_span
 
       if span.custom?
-        if span[:data][:sdk].key?(:custom)
+        if span[:data][:sdk][:custom]?
           span[:data][:sdk][:custom].merge!(kvs)
         else
           span[:data][:sdk][:custom] = kvs
         end
       else
         kvs.each_pair do |k, v|
-          if !span[:data].key?(k)
+          if !span[:data][k]?
             span[:data][k] = v
           elsif v.is_a?(Hash) && span[:data][k].is_a?(Hash)
             span[:data][k].merge!(v)
@@ -199,11 +200,11 @@ module Instana
     # Indicates whether all seems ok with this trace in it's current state.
     # Should be only called on finished traces.
     #
-    # @return [Boolean] true or false on whether this trace is valid
+    # @return [Bool] true or false on whether this trace is valid
     #
     def valid?
       @spans.each do |span|
-        unless span.key?(:d)
+        unless span[:d]?
           return false
         end
       end
@@ -231,12 +232,12 @@ module Instana
     # Searches the set of spans and indicates if there
     # is an error logged in one of them.
     #
-    # @return [Boolean] true or false indicating the presence
+    # @return [Bool] true or false indicating the presence
     #   of an error
     #
     def has_error?
       @spans.each do |s|
-        if s.key?(:error)
+        if s[:error]?
           if s[:error] == true
             return true
           end
@@ -273,7 +274,7 @@ module Instana
     #
     # @param name [Symbol] The name to be checked against.
     #
-    # @return [Boolean]
+    # @return [Bool]
     #
     def current_span_name?(name)
       @current_span.name == name
@@ -283,12 +284,12 @@ module Instana
     # whether we have hit the timeout on waiting for those async
     # spans to close out.
     #
-    # @return [Boolean]
+    # @return [Bool]
     #
     def discard?
       # If this trace has async spans that have not closed
       # out in 5 minutes, then it's discarded.
-      if has_async? && (Time.now.to_i - @started_at.to_i) > 601
+      if has_async? && (Time.now - @started_at) > Time::Span.new(0, 0, 5, 1)
         return true
       end
       false

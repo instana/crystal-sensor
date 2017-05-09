@@ -1,12 +1,18 @@
 require "thread"
 
 module Instana
+  @@processor : ::Instana::Processor?
+
+  def self.processor
+    @@processor ||= ::Instana::Processor.new
+  end
+
   class Processor
     def initialize
       # The main queue before being reported to the
       # host agent.  Traces in this queue are complete
       # and ready to be sent.
-      @queue = Queue.new
+      @queue = Array(Trace).new
 
       # The staging queue that holds traces that have completed
       # but still have outstanding async spans.
@@ -24,7 +30,7 @@ module Instana
     #
     # @param [Trace] the trace to be added to the queue
     def add(trace)
-      ::Instana.logger.trace("Queuing completed trace id: #{trace.id}")
+      ::Instana.logger.debug("Queuing completed trace id: #{trace.id}")
       @queue.push(trace)
     end
 
@@ -32,7 +38,7 @@ module Instana
     #
     # @param [Trace] the trace to be added to the queue
     def stage(trace)
-      ::Instana.logger.trace("Staging incomplete trace id: #{trace.id}")
+      ::Instana.logger.debug("Staging incomplete trace id: #{trace.id}")
       @staging_queue.add(trace)
     end
 
@@ -43,14 +49,14 @@ module Instana
     def process_staged
       @staging_lock.synchronize {
         if @staging_queue.size > 0
-          @staging_queue.delete_if do |t|
+          @staging_queue.each do |t|
             if t.complete?
-              ::Instana.logger.trace("Moving staged complete trace to main queue: #{t.id}")
+              ::Instana.logger.debug("Moving staged complete trace to main queue: #{t.id}")
               add(t)
-              true
+              @staging_queue.delete(t)
             elsif t.discard?
               ::Instana.logger.debug("Discarding trace with uncompleted async spans over 5 mins old. id: #{t.id}")
-              true
+              @staging_queue.delete(t)
             else
               false
             end
@@ -97,12 +103,12 @@ module Instana
     # @return [Array] An array of [Span] or empty
     #
     def queued_spans
-      spans = [] of Span
+      spans = [] of ::Instana::Span::JSONSpan
 
       if !@queue.empty?
         until @queue.empty?
           # Non-blocking pop; ignore exception
-          trace = @queue.pop(true) # FIXME rescue nil
+          trace = @queue.pop # FIXME rescue nil
           trace.spans.each do |s|
             spans << s.raw
           end
@@ -160,7 +166,7 @@ module Instana
         end
       }
       unless candidate
-        ::Instana.logger.trace("Couldn't find staged trace with trace_id: #{trace_id}")
+        ::Instana.logger.debug("Couldn't find staged trace with trace_id: #{trace_id}")
       end
       candidate
     end
@@ -187,7 +193,7 @@ module Instana
     def clear!
       until @queue.empty?
         # Non-blocking pop; ignore exception
-        @queue.pop(true) # FIXME rescue nil
+        @queue.pop # FIXME rescue nil
       end
       @staging_queue.clear
     end

@@ -63,8 +63,9 @@ module Instana
     # is generally used once per process.
     #
     def self.take_snapshot
-      data = {:sensorVersion   => ::Instana::VERSION,
-              :crystal_version => crystal_version}
+      data = {:sensorVersion => ::Instana::VERSION,
+              # FIXME
+              :crystal_version => "0.22"}
 
       # Report Bundle
       # FIXME Convert to shard list
@@ -78,7 +79,7 @@ module Instana
 
       data
     rescue e
-      ::Instana.logger.error "#{__method__}:#{File.basename(__FILE__)}:#{__LINE__}: #{e.message}"
+      ::Instana.logger.error "take_snapshot:#{File.basename(__FILE__)}:#{__LINE__}: #{e.message}"
       ::Instana.logger.debug e.backtrace.join("\r\n")
       return data
     end
@@ -87,26 +88,23 @@ module Instana
     # collects up process information
     #
     def self.collect_process_info
-      process = {String, String}
+      process = {} of Symbol => String | Int32 | Array(String) | Nil
       cmdline_file = "/proc/#{Process.pid}/cmdline"
 
       # If there is a /proc filesystem, we read this manually so
       # we can split on embedded null bytes.  Otherwise (e.g. OSX, Windows)
       # use ProcTable.
-      if File.exist?(cmdline_file)
+      if File.exists?(cmdline_file)
         # FIXME: Null bye results in unterminated call?
         # cmdline = IO.read(cmdline_file).split(?\x00)
+        cmdline = File.read(cmdline_file).split(" ")
       else
-        cmdline = ProcTable.ps(Process.pid).cmdline.split(' ')
+        cmdline = String.new(ARGV_UNSAFE.value).split(" ")
       end
 
-      if CRYSTAL_PLATFORM =~ /darwin/i
-        cmdline.delete_if { |e| e.include?('=') }
-        process[:name] = cmdline.join(' ')
-      else
-        process[:name] = cmdline.shift
-        process[:arguments] = cmdline
-      end
+      cmdline.each { |e| cmdline.delete(e) if e.includes?('=') }
+      process[:name] = cmdline.shift
+      process[:arguments] = cmdline
 
       process[:pid] = Process.pid
       # This is usually Process.pid but in the case of containers, the host agent
@@ -153,7 +151,7 @@ module Instana
       end
       [id.to_i].pack("q>").unpack("H*")[0]
     rescue e
-      Instana.logger.error "#{__method__}:#{File.basename(__FILE__)}:#{__LINE__}: #{e.message}"
+      Instana.logger.error "id_to_header:#{File.basename(__FILE__)}:#{__LINE__}: #{e.message}"
       Instana.logger.debug e.backtrace.join("\r\n")
     end
 
@@ -170,7 +168,7 @@ module Instana
       end
       [header_id].pack("H*").unpack("q>")[0]
     rescue e
-      Instana.logger.error "#{__method__}:#{File.basename(__FILE__)}:#{__LINE__}: #{e.message}"
+      Instana.logger.error "header_to_id:#{File.basename(__FILE__)}:#{__LINE__}: #{e.message}"
       Instana.logger.debug e.backtrace.join("\r\n")
     end
   end

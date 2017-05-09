@@ -1,7 +1,7 @@
 module Instana
   module Helpers
-    EUM_SNIPPET      = (File.read(File.dirname(__FILE__) + "/eum/eum.js.erb")).freeze
-    EUM_TEST_SNIPPET = (File.read(File.dirname(__FILE__) + "/eum/eum-test.js.erb")).freeze
+    EUM_SNIPPET      = (File.read(File.dirname(__FILE__) + "/eum/eum.js.erb"))
+    EUM_TEST_SNIPPET = (File.read(File.dirname(__FILE__) + "/eum/eum-test.js.erb"))
 
     # Returns a processed javascript snippet to be placed within the HEAD tag of an HTML page.
     #
@@ -13,7 +13,7 @@ module Instana
 
       ERB.new(EUM_SNIPPET).result
     rescue e
-      Instana.logger.error "#{__method__}:#{File.basename(__FILE__)}:#{__LINE__}: #{e.message}"
+      Instana.logger.error "eum_snippet:#{File.basename(__FILE__)}:#{__LINE__}: #{e.message}"
       Instana.logger.debug e.backtrace.join("\r\n")
       return nil
     end
@@ -29,7 +29,7 @@ module Instana
 
       ERB.new(EUM_TEST_SNIPPET).result
     rescue e
-      Instana.logger.error "#{__method__}:#{File.basename(__FILE__)}:#{__LINE__}: #{e.message}"
+      Instana.logger.error "eum_test_snippet:#{File.basename(__FILE__)}:#{__LINE__}: #{e.message}"
       Instana.logger.debug e.backtrace.join("\r\n")
       return nil
     end

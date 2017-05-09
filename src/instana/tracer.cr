@@ -3,9 +3,19 @@ require "./tracing/span"
 require "./tracing/span_context"
 
 module Instana
+  @@tracer : Tracer?
+
+  def self.tracer
+    @@tracer ||= Tracer.new
+  end
+
   class Tracer
     @[ThreadLocal]
-    @current_trace = nil
+    @current_trace : Trace | Nil
+
+    def initialize
+      @current_trace = nil
+    end
 
     #######################################
     # Tracing blocks API methods
@@ -16,7 +26,7 @@ module Instana
     #
     # @param name [String] the name of the span to start
     # @param kvs [Hash] list of key values to be reported in the span
-    # @param incoming_context [Hash] specifies the incoming context.  At a
+    # @param incoming_caontext [Hash] specifies the incoming context.  At a
     #   minimum, it should specify :trace_id and :span_id from the following:
     #     @:trace_id the trace ID (must be an unsigned hex-string)
     #     :span_id the ID of the parent span (must be an unsigned hex-string)
@@ -71,7 +81,7 @@ module Instana
     #
     def log_start_or_continue(name, kvs = nil, incoming_context = nil)
       return if !::Instana.agent.ready? || !::Instana.config[:tracing][:enabled]
-      ::Instana.logger.debug "#{__method__} passed a block.  Use `start_or_continue` instead!" if block_given?
+      ::Instana.logger.debug "log_start_or_continue passed a block.  Use `start_or_continue` instead!" if block_given?
       self.current_trace = ::Instana::Trace.new(name, kvs, incoming_context)
     end
 
@@ -192,7 +202,7 @@ module Instana
         if trace
           trace.add_async_info(kvs, span)
         else
-          ::Instana.logger.debug "#{__method__}: Couldn't find staged trace. #{span.inspect}"
+          ::Instana.logger.debug "log_async_info: Couldn't find staged trace. #{span.inspect}"
         end
       end
     end
@@ -215,7 +225,7 @@ module Instana
         if trace
           trace.add_async_error(e, span)
         else
-          ::Instana.logger.debug "#{__method__}: Couldn't find staged trace. #{span.inspect}"
+          ::Instana.logger.debug "log_async_error: Couldn't find staged trace. #{span.inspect}"
         end
       end
     end
@@ -241,7 +251,7 @@ module Instana
         if trace
           trace.end_async_span(kvs, span)
         else
-          ::Instana.logger.debug "#{__method__}: Couldn't find staged trace. #{span.inspect}"
+          ::Instana.logger.debug "log_async_exit: Couldn't find staged trace. #{span.inspect}"
         end
       end
     end
@@ -318,7 +328,7 @@ module Instana
     # collecting a trace.  This is false when the host agent isn
     # available.
     #
-    # @return [Boolean] true or false on whether we are currently tracing or not
+    # @return [Bool] true or false on whether we are currently tracing or not
     #
     def tracing?
       # The non-nil value of this instance variable
@@ -332,7 +342,7 @@ module Instana
     #
     # @param name [Symbol] the name to check against the current span
     #
-    # @return [Boolean]
+    # @return [Bool]
     #
     def tracing_span?(name)
       if self.current_trace

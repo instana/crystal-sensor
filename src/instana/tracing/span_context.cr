@@ -10,10 +10,12 @@ module Instana
     # @param sid [Integer] the span ID
     # @param baggage [Hash] baggage applied to this trace
     #
-    def initialize(tid, sid, baggage = nil)
+    def initialize(tid, sid, baggage = {} of Symbol => String)
       @trace_id = tid
       @span_id = sid
-      @baggage = baggage
+      if baggage.is_a?(Hash)
+        @baggage = baggage
+      end
     end
 
     def trace_id_header
@@ -25,7 +27,7 @@ module Instana
     end
 
     def to_hash
-      { :trace_id => @trace_id, :span_id => @span_id }
+      {:trace_id => @trace_id, :span_id => @span_id}
     end
   end
 end

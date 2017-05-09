@@ -1,7 +1,5 @@
 require "./instana/setup"
 
-KVType(Symbol, String | Int32 | Boolean)
-
 # Boot the instana agent background thread.  If you wish to have greater
 # control on the where and which thread this is run in, instead use
 #
@@ -10,6 +8,6 @@ KVType(Symbol, String | Int32 | Boolean)
 # ...and manually call ::Instana.agent.start in the thread
 # of your choice
 #
-Thread.new do
+spawn do
   ::Instana.agent.start
 end

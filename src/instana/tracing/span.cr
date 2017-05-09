@@ -5,11 +5,13 @@ module Instana
     EXIT_SPANS       = [] of Symbol
     HTTP_SPANS       = ENTRY_SPANS + EXIT_SPANS
 
+    alias JSONSpan = Hash(Symbol, String | Int64 | Symbol)
+
     property :parent
     property :baggage
 
     def initialize(name, trace_id, parent_id = nil, start_time = Time.now)
-      @data = Hash(Symbol, String)
+      @data = JSONSpan.new
       @data[:t] = trace_id                    # Trace ID
       @data[:s] = ::Instana::Util.generate_id # Span ID
       @data[:p] = parent_id if parent_id      # Parent ID
@@ -22,16 +24,16 @@ module Instana
       # Start time
       @data[:ts] = ::Instana::Util.time_to_ms(start_time)
 
-      @baggage = Hash{Symbol, String}
+      @baggage = Hash(Symbol, String)
 
       # For entry spans, add a backtrace fingerprint
-      add_stack(limit: 2) if ENTRY_SPANS.include?(name)
+      add_stack(limit: 2) if ENTRY_SPANS.includes?(name)
 
       # Attach a backtrace to all exit spans
-      add_stack if EXIT_SPANS.include?(name)
+      add_stack if EXIT_SPANS.includes?(name)
 
       # Check for custom tracing
-      if REGISTERED_SPANS.include?(name.to_sym)
+      if REGISTERED_SPANS.includes?(name.to_sym)
         @data[:n] = name.to_sym
       else
         configure_custom(name)
@@ -72,7 +74,7 @@ module Instana
     def add_error(e)
       @data[:error] = true
 
-      if @data.key?(:ec)
+      if @data[:ec]?
         @data[:ec] = @data[:ec] + 1
       else
         @data[:ec] = 1
@@ -86,7 +88,7 @@ module Instana
           add_stack(stack: e.backtrace)
         end
 
-        if HTTP_SPANS.include?(@data[:n])
+        if HTTP_SPANS.includes?(@data[:n])
           error = {:error => "#{e.class}: #{e.message}"}
           http = {:http => error}
           set_tags(http)
@@ -109,19 +111,6 @@ module Instana
     def configure_custom(name)
       @data[:n] = :sdk
       @data[:data] = {:sdk => {:name => name.to_sym}}
-
-      # if kvs.is_a?(Hash)
-      #  @data[:data][:sdk][:type] = kvs.key?(:type) ? kvs[:type] : :local
-      #
-      #        if kvs.key?(:arguments)
-      #          @data[:data][:sdk][:arguments] = kvs[:arguments]
-      #        end
-      #
-      #        if kvs.key?(:return)
-      #          @data[:data][:sdk][:return] = kvs[:return]
-      #        end
-      #        @data[:data][:sdk][:custom] = kvs unless kvs.empty?
-      #      end
       self
     end
 
@@ -214,7 +203,7 @@ module Instana
     # Indicates whether this span in the root span
     # in the Trace
     #
-    # @return [Boolean]
+    # @return [Bool]
     #
     def is_root?
       @data[:s] == @data[:t]
@@ -234,8 +223,8 @@ module Instana
 
     # Hash key query to the internal @data hash
     #
-    def key?(k)
-      @data.key?(k.to_sym)
+    def []?(k)
+      @data[k.to_sym]?
     end
 
     # Get the raw @data hash that summarizes this span
@@ -266,8 +255,8 @@ module Instana
     # Spec: OpenTracing API
     #
     # @param key [String] the key of the tag
-    # @param value [String, Numeric, Boolean] the value of the tag. If it's not
-    # a String, Numeric, or Boolean it will be encoded with to_s
+    # @param value [String, Numeric, Bool] the value of the tag. If it's not
+    # a String, Numeric, or Bool it will be encoded with to_s
     #
     def set_tag(key, value)
       if custom?
@@ -283,7 +272,7 @@ module Instana
           end
         end
       else
-        if !@data[:data].key?(key)
+        if !@data[:data][key]?
           @data[:data][key] = value
         elsif value.is_a?(Hash) && self[:data][key].is_a?(Hash)
           @data[:data][key].merge!(value)

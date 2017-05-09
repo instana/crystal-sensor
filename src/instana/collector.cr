@@ -1,11 +1,19 @@
 module Instana
-  class Collector
+  @@metrics : ::Instana::Metrics?
+
+  def self.metrics
+    @@metrics ||= ::Instana::Metrics.new
+  end
+
+  class Metrics
     property :collectors
     property :last_report_log
 
+    @snapshot : Hash(Symbol, String) | Nil
+
     def initialize
       # FIXME
-      @collectors = [] of Inst32
+      @collectors = [] of ::Instana::Collector
 
       # Snapshot data is collected once per process but resent
       # every 10 minutes along side process metrics.
@@ -43,10 +51,11 @@ module Instana
     # Run through each collector, let them collect up
     # data and then report what we have via the agent
     #
-    # @return Boolean true on success
+    # @return Bool true on success
     #
     def collect_and_report
-      return unless ::Instana.config[:metrics][:enabled]
+      # FIXME
+      # return unless ::Instana.config[:metrics][:enabled]
 
       payload = {} of Symbol => Int32
       with_snapshot = false
@@ -64,16 +73,18 @@ module Instana
       end
 
       # Every 5 minutes, send snapshot data as well
-      if (Time.now - @last_snapshot) > 600
+      if (Time.now - @last_snapshot) > Time::Span.new(0, 0, 5, 0)
         with_snapshot = true
-        payload.merge!(@snapshot)
+        # FIXME
+        # payload.merge!(@snapshot)
 
         # Add in process related that could have changed since
         # snapshot was taken.
         p = {:pid => ::Instana.agent.report_pid}
         p[:name] = ::Instana.agent.process[:name]
         p[:exec_args] = ::Instana.agent.process[:arguments]
-        payload.merge!(p)
+        # FIXME
+        # payload.merge!(p)
       else
         payload = enforce_deltas(payload, @last_values)
       end
@@ -98,20 +109,29 @@ module Instana
     # @return [Hash] the candidate hash with delta reporting applied
     #
     def enforce_deltas(candidate, last)
-      candidate.each do |k, v|
-        if v.is_a?(Hash)
-          last[k] ||= {} of Symbol => Int32
-          candidate[k] = enforce_deltas(candidate[k], last[k])
-          candidate.delete(k) if candidate[k].empty?
-        else
-          if last[k] == v
-            candidate.delete(k)
-          else
-            last[k] = candidate[k]
-          end
-        end
-      end
-      candidate
+      # FIXME
+      #   candidate.each do |k, v|
+      #     if v.is_a?(Hash)
+      #       last[k] ||= {} of Symbol => Int32
+      #       candidate[k] = enforce_deltas(candidate[k], last[k])
+      #       candidate.delete(k) if candidate[k].empty?
+      #     else
+      #       if last[k] == v
+      #         candidate.delete(k)
+      #       else
+      #         last[k] = candidate[k]
+      #       end
+      #     end
+      #   end
+      #   candidate
+    end
+  end
+
+  class Collector
+    def collect
+    end
+
+    def payload_key
     end
   end
 end

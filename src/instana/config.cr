@@ -1,9 +1,13 @@
 module Instana
   @@config = ::Instana::Config.new
 
+  def self.config
+    @@config
+  end
+
   class Config
     def initialize
-      @@config = {
+      @data = {
         :agent_host => "127.0.0.1",
         :agent_port => 42699,
 
@@ -14,13 +18,13 @@ module Instana
 
         # Enable/disable metrics globally or individually (default: all enabled)
         :metrics => {:enabled => true,
-          :gc => {:enabled => true},
-          :memory => {:enabled => true},
-          :thread => {:enabled => true},
+                     :gc => {:enabled => true},
+                     :memory => {:enabled => true},
+                     :thread => {:enabled => true},
         },
         # Enable/disable tracing (default: enabled)
         :tracing   => {:enabled => true},
-        :collector => {:enabled => true, :interval => 1},
+        :collector => {:enabled => true},
 
         # EUM Related
         :eum_api_key => nil,
@@ -43,17 +47,17 @@ module Instana
     end
 
     def [](key)
-      @config[key.to_sym]
+      @data[key]
     end
 
     def []=(key, value)
-      @config[key.to_sym] = value
+      @data[key] = value
 
       if key == :enabled
         # Configuring global enable/disable flag, then set the
         # appropriate children flags.
-        @config[:metrics][:enabled] = value
-        @config[:tracing][:enabled] = value
+        @data[:metrics][:enabled] = value
+        @data[:tracing][:enabled] = value
       end
     end
   end
