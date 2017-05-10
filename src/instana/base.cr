@@ -27,7 +27,7 @@ module Instana
   # @return Bool
   #
   def self.debug?
-    ENV["INSTANA_GEM_DEV"]?
+    ENV["INSTANA_SHARD_DEV"]?
   end
 
   # Indicates whether we are running in the test environment.
@@ -35,7 +35,7 @@ module Instana
   # @return Bool
   #
   def self.test?
-    ENV["INSTANA_GEM_TEST"]?
+    ENV["INSTANA_SHARD_TEST"]?
   end
 end
 

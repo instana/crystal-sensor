@@ -316,7 +316,7 @@ module Instana
     # for docker in bridged mode.
     #
     def host_agent_ready?
-      run_discovery unless @discovered[:done]
+      run_discovery unless @discovered[:done]?
       if @discovered
         # Try default location or manually configured (if so)
         uri = URI.parse("http://#{@discovered[:agent_host]}:#{@discovered[:agent_port]}/")
@@ -390,7 +390,7 @@ module Instana
     #
     def ready?
       # In test, we"re always ready :-)
-      return true if ENV["INSTANA_GEM_TEST"]
+      return true if ENV["INSTANA_SHARD_TEST"]
 
       if forked?
         ::Instana.logger.debug "Instana: detected fork.  Calling after_fork"

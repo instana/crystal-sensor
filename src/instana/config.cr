@@ -41,7 +41,7 @@ module Instana
       }
 
       # FIXME
-      # if ENV["INSTANA_GEM_DEV"]?
+      # if ENV["INSTANA_SHARD_DEV"]?
       #   @config[:collector][:interval] = 3
       # end
     end

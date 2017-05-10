@@ -7,9 +7,9 @@ module Instana
 
     def initialize(*args)
       super(*args)
-      if ENV["INSTANA_GEM_TEST"]?
+      if ENV["INSTANA_SHARD_TEST"]?
         self.level = Logger::DEBUG
-      elsif ENV["INSTANA_GEM_DEV"]?
+      elsif ENV["INSTANA_SHARD_DEV"]?
         self.level = Logger::DEBUG
       else
         self.level = Logger::WARN
