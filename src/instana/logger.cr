@@ -16,18 +16,6 @@ module Instana
       end
     end
 
-    # Sets the debug level for this logger.  The debug level is broken up into various
-    # sub-levels as defined in LEVELS:
-    #
-    # :agent          - All agent related messages such as state & announcements
-    # :agent_comm     - Output all payload comm sent between this Crystal gem and the host agent
-    # :agent_response - Outputs messages related to handling requests received by the host agent
-    # :trace          - Output all traces reported to the host agent
-    # :tracing        - Output messages related to tracing components, spans and management
-    #
-    # To use:
-    # ::Instana.logger.debug_level = [:agent_comm, :trace]
-    #
     def error(msg)
       super(STAMP + msg)
     end

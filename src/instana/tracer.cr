@@ -80,7 +80,7 @@ module Instana
     #     :level specifies data collection level (optional)
     #
     def log_start_or_continue(name, kvs = nil, incoming_context = nil)
-      return if !::Instana.agent.ready? || !::Instana.config[:tracing][:enabled]
+      return if !::Instana.agent.ready? || !::Instana.config.tracing_enabled
       ::Instana.logger.debug "log_start_or_continue passed a block.  Use `start_or_continue` instead!" if block_given?
       self.current_trace = ::Instana::Trace.new(name, kvs, incoming_context)
     end

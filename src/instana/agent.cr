@@ -11,6 +11,13 @@ module Instana
     @@agent ||= Agent.new
   end
 
+  struct Discovered
+    property host = "127.0.0.1"
+    property port = 42699
+    property has_run = false
+    property found = false
+  end
+
   class Agent
     property :state
     property :agent_uuid
@@ -21,7 +28,6 @@ module Instana
     DISCOVERY_PATH = "com.instana.plugin.crystal.discovery"
 
     @default_gateway : String | Nil
-    @discovered = {} of Symbol => String | Int32
     @@agent_uuid : String | Nil
 
     def initialize
@@ -52,6 +58,11 @@ module Instana
         # Nil by default
         # @default_gateway = nil
       end
+
+      # We probe for possible locations where the host agent may be listening
+      # for us to communicate with.  We store the results of this probe
+      # in this class.
+      @discovered = Discovered.new
 
       # The agent UUID returned from the host agent
       # Nil by default
@@ -176,7 +187,7 @@ module Instana
     # the host agent.
     #
     def announce_sensor
-      if @discovered.empty?
+      if !@discovered.has_run
         ::Instana.logger.debug("announce_sensor called but discovery hasn't run yet!")
         return false
       end
@@ -191,17 +202,18 @@ module Instana
       # if @has_procfs && !::Instana.test?
       #   # We create an open socket to the host agent in case we are running in a container
       #   # and the real pid needs to be detected.
-      #   socket = TCPSocket.new(@discovered[:agent_host], @discovered[:agent_port])
+      #   socket = TCPSocket.new(@discovered.host, @discovered.port)
       #   announce_payload[:fd] = socket.fileno
       #   announce_payload[:inode] = File.readlink("/proc/#{Process.pid}/fd/#{socket.fileno}")
       # end
 
-      uri = URI.parse("http://#{@discovered[:agent_host]}:#{@discovered[:agent_port]}/#{DISCOVERY_PATH}")
+      h = HTTP::Headers{"Accept" => MIME_JSON, "Content-Type" => MIME_JSON}
+      uri = URI.parse("http://#{@discovered.host}:#{@discovered.port}/#{DISCOVERY_PATH}")
       body = announce_payload.to_json
 
-      ::Instana.logger.debug "Announce: http://#{@discovered[:agent_host]}:#{@discovered[:agent_port]}/#{DISCOVERY_PATH} - payload: #{body}"
+      ::Instana.logger.debug "Announce: http://#{@discovered.host}:#{@discovered.port}/#{DISCOVERY_PATH} - payload: #{body}"
 
-      response = make_host_agent_request(uri, body, :post)
+      response = HTTP::Client.put(url: uri, headers: h, body: body)
 
       if response && (response.status_code == 200)
         data = JSON.parse(response.body)
@@ -227,13 +239,13 @@ module Instana
     # @return [Bool] true on success, false otherwise
     #
     def report_metrics(payload)
-      if @discovered.empty?
+      if @discovered.has_run
         ::Instana.logger.debug("report_metrics called but discovery hasn't run yet!")
         return false
       end
 
       path = "com.instana.plugin.crystal.#{@process[:report_pid]}"
-      uri = URI.parse("http://#{@discovered[:agent_host]}:#{@discovered[:agent_port]}/#{path}")
+      uri = URI.parse("http://#{@discovered.host}:#{@discovered.port}/#{path}")
 
       response = make_host_agent_request(uri, payload.to_json, :post)
 
@@ -269,14 +281,14 @@ module Instana
       #   if their_request["action"] == "crystal.source"
       #     payload = ::Instana::Util.get_cr_source(their_request["args"]["file"])
       #   else
-      #     payload = {:error => "Unrecognized action: #{their_request["action"]}. An newer Instana gem may be required for this. Current version: #{::Instana::VERSION}"}
+      #     payload = {:error => "Unrecognized action: #{their_request["action"]}. An newer Instana shard may be required for this. Current version: #{::Instana::VERSION}"}
       #   end
       # else
       #   payload = {:error => "Instana Crystal: No action specified in request."}
       # end
       #
       # path = "com.instana.plugin.crystal/response.#{@process[:report_pid]}?messageId=#{URI.encode(their_request["messageId"])}"
-      # uri = URI.parse("http://#{@discovered[:agent_host]}:#{@discovered[:agent_port]}/#{path}")
+      # uri = URI.parse("http://#{@discovered.host}:#{@discovered.port}/#{path}")
       # ::Instana.logger.debug_response "Responding to agent: #{payload.inspect}"
       # make_host_agent_request(uri, payload.to_json, :post)
     end
@@ -289,13 +301,13 @@ module Instana
     def report_spans(spans)
       return unless @state == :announced
 
-      if @discovered.empty?
+      if @discovered.has_run
         ::Instana.logger.debug("report_spans called but discovery hasn't run yet!")
         return false
       end
 
       path = "com.instana.plugin.crystal/traces.#{@process[:report_pid]}"
-      uri = URI.parse("http://#{@discovered[:agent_host]}:#{@discovered[:agent_port]}/#{path}")
+      uri = URI.parse("http://#{@discovered.host}:#{@discovered.port}/#{path}")
       response = make_host_agent_request(uri, spans.to_json, :post)
 
       if response
@@ -316,10 +328,9 @@ module Instana
     # for docker in bridged mode.
     #
     def host_agent_ready?
-      run_discovery unless @discovered[:done]?
-      if @discovered
+      if run_discovery
         # Try default location or manually configured (if so)
-        uri = URI.parse("http://#{@discovered[:agent_host]}:#{@discovered[:agent_port]}/")
+        uri = URI.parse("http://#{@discovered.host}:#{@discovered.port}/")
 
         response = make_host_agent_request(uri, nil, :get)
 
@@ -336,47 +347,47 @@ module Instana
 
     # Runs a discovery process to determine where we can contact the host agent.  This is usually just
     # localhost but in docker can be found on the default gateway.  This also allows for manual
-    # configuration via ::Instana.config[:agent_host/port].
+    # configuration via ::Instana.config.agent_host/port.
     #
     # @return [Hash] a hash with :agent_host, :agent_port values or empty hash
     #
     def run_discovery
-      discovered = {
-        :agent_host => ::Instana.config[:agent_host],
-        :agent_port => ::Instana.config[:agent_port],
-      }
-
       ::Instana.logger.debug "run_discovery: Running agent discovery..."
+      @discovered.has_run = true
 
       # Try default location or manually configured (if so)
-      uri = URI.parse("http://#{::Instana.config[:agent_host]}:#{::Instana.config[:agent_port]}/")
+      uri = URI.parse("http://#{::Instana.config.agent_host}:#{::Instana.config.agent_port}/")
 
-      ::Instana.logger.debug "run_discovery: Trying #{::Instana.config[:agent_host]}:#{::Instana.config[:agent_port]}"
+      ::Instana.logger.debug "run_discovery: Trying #{::Instana.config.agent_host}:#{::Instana.config.agent_port}"
 
       response = make_host_agent_request(uri, nil, :get)
 
       if response && (response.status_code == 200)
-        ::Instana.logger.debug "run_discovery: Found #{discovered[:agent_host]}:#{discovered[:agent_port]}"
-        return discovered
+        @discovered.host = ::Instana.config.agent_host
+        @discovered.port = ::Instana.config.agent_port
+        @discovered.found = true
+
+        ::Instana.logger.debug "run_discovery: Found #{@discovered.host}:#{@discovered.port}"
+        return true
       end
 
       return nil unless @has_procfs
 
       # We are potentially running on Docker in bridged networking mode.
       # Attempt to contact default gateway
-      uri = URI.parse("http://#{@default_gateway}:#{::Instana.config[:agent_port]}/")
+      uri = URI.parse("http://#{@default_gateway}:#{::Instana.config.agent_port}/")
 
-      ::Instana.logger.debug "run_discovery: Trying default gateway #{@default_gateway}:#{::Instana.config[:agent_port]}"
+      ::Instana.logger.debug "run_discovery: Trying default gateway #{@default_gateway}:#{::Instana.config.agent_port}"
 
       response = make_host_agent_request(uri, nil, :get)
 
       if response && (response.status_code == 200)
-        discovered[:agent_host] = @default_gateway
-        discovered[:agent_port] = ::Instana.config[:agent_port]
-        ::Instana.logger.debug "run_discovery: Found #{discovered[:agent_host]}:#{discovered[:agent_port]}"
-        return discovered
+        @discovered.host = @default_gateway.to_s
+        @discovered.port = ::Instana.config.agent_port
+        ::Instana.logger.debug "run_discovery: Found #{@discovered.host}:#{@discovered.port}"
+        return true
       end
-      nil
+      false
     end
 
     # Returns the PID that we are reporting to
@@ -440,13 +451,12 @@ module Instana
       h = HTTP::Headers{"Accept" => MIME_JSON, "Content-Type" => MIME_JSON}
       response = HTTP::Client.exec(method.to_s, url: uri, headers: h, body: body)
 
-      ::Instana.logger.debug "#{method}->#{uri} body:(#{body}) Response:#{response} body:(#{response.body})"
-      response
       # FIXME
       # rescue e : Errno::ECONNREFUSED
       #   return nil
 
-
+      ::Instana.logger.debug "#{method}->#{uri} header:#{h.to_s} body:(#{body}) Response:#{response.status_code} body:(#{response.body})"
+      response
     rescue e
       Instana.logger.error "make_host_agent_request:#{File.basename(__FILE__)}:#{__LINE__}: #{e.message}"
       Instana.logger.debug e.backtrace.join("\r\n") unless ::Instana.test?

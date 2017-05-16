@@ -49,7 +49,7 @@ module Instana
       @data[:stack] = [] of String
 
       stack.each do |i|
-        # If the stack has the full instana gem version in it's path
+        # If the stack has the full instana shard version in it's path
         # then don't include that frame. Also don't exclude the Rack module.
         if !i.match(/instana\/instrumentation\/rack.rb/).nil? ||
            (i.match(::Instana::VERSION_FULL).nil? && i.match("lib/instana/").nil?)

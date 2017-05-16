@@ -8,8 +8,8 @@ module Instana
     def self.eum_snippet(api_key, kvs = {Symbol, String})
       return nil if !::Instana.tracer.tracing?
 
-      ::Instana.config[:eum_api_key] = api_key
-      ::Instana.config[:eum_baggage] = kvs
+      ::Instana.config.eum_api_key = api_key
+      ::Instana.config.eum_baggage = kvs
 
       ERB.new(EUM_SNIPPET).result
     rescue e
@@ -24,8 +24,8 @@ module Instana
     def self.eum_test_snippet(api_key, kvs = {Symbol, String})
       return nil if !::Instana.tracer.tracing?
 
-      ::Instana.config[:eum_api_key] = api_key
-      ::Instana.config[:eum_baggage] = kvs
+      ::Instana.config.eum_api_key = api_key
+      ::Instana.config.eum_baggage = kvs
 
       ERB.new(EUM_TEST_SNIPPET).result
     rescue e
