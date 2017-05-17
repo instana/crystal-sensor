@@ -1,6 +1,8 @@
 # instana
 
-WIP: The instana shard provides Crystal tracing for [Instana](https://www.instana.com/).
+The Instana shard provides Crystal metrics and tracing for [Instana](https://www.instana.com/).
+
+Any and all feedback is welcome.  Happy Crystal visibility.
 
 ## Installation
 
@@ -18,20 +20,16 @@ dependencies:
 require "instana"
 ```
 
-TODO: Write usage instructions here
-
-## Development
-
-TODO: Write development instructions here
-
 ## Contributing
 
-1. Fork it ( https://github.com/[your-github-name]/instana/fork )
+1. Fork it ( https://github.com/instana/crystal-sensor/fork )
 2. Create your feature branch (git checkout -b my-new-feature)
 3. Commit your changes (git commit -am 'Add some feature')
 4. Push to the branch (git push origin my-new-feature)
 5. Create a new Pull Request
 
+Bug reports and pull requests are welcome on GitHub at https://github.com/instana/crystal-sensor.
+
 ## Contributors
 
-- [[your-github-name]](https://github.com/[your-github-name]) Peter Giacomo Lombardo - creator, maintainer
+- [pglombardo](https://github.com/pglombardo) Peter Giacomo Lombardo - creator, maintainer
