@@ -18,10 +18,17 @@ module Instana
     property found = false
   end
 
+  struct ProcessEntity
+    property name : String | Nil
+    property arguments : Array(String) | Nil
+    property report_pid : Int32 | Nil
+    property pid : Int32 | Nil
+  end
+
   class Agent
     property :state
     property :agent_uuid
-    property :process
+    property process : ProcessEntity
 
     LOCALHOST      = "127.0.0.1"
     MIME_JSON      = "application/json"
@@ -69,7 +76,6 @@ module Instana
       # @@agent_uuid = nil
 
       # Collect process information
-      @process = {} of Symbol => String | Int32 | Array(String) | Nil
       @process = ::Instana::Util.collect_process_info
     end
 
@@ -121,8 +127,8 @@ module Instana
       # The announce timer
       # We attempt to announce this crystal sensor to the host agent.
       # In case of failure, we try again in 30 seconds.
-      @announce_timer = Quartz::PeriodicTimer.new(30) do
-        if host_agent_ready? && announce_sensor
+      @announce_timer = Quartz::PeriodicTimer.new(15) do
+        if @state == :unannounced && host_agent_ready? && announce_sensor
           ::Instana.logger.warn "Host agent available. We're in business."
           transition_to(:announced)
         end
@@ -193,9 +199,9 @@ module Instana
       end
 
       announce_payload = {
-        :pid  => pid_namespace? ? get_real_pid : Process.pid,
-        :name => @process[:name],
-        :args => @process[:arguments],
+        :pid  => pid_namespace? ? get_real_pid : ::Process.pid,
+        :name => @process.name,
+        :args => @process.arguments,
       }
 
       # FIXME
@@ -204,7 +210,7 @@ module Instana
       #   # and the real pid needs to be detected.
       #   socket = TCPSocket.new(@discovered.host, @discovered.port)
       #   announce_payload[:fd] = socket.fileno
-      #   announce_payload[:inode] = File.readlink("/proc/#{Process.pid}/fd/#{socket.fileno}")
+      #   announce_payload[:inode] = File.readlink("/proc/#{::Process.pid}/fd/#{socket.fileno}")
       # end
 
       h = HTTP::Headers{"Accept" => MIME_JSON, "Content-Type" => MIME_JSON}
@@ -217,7 +223,7 @@ module Instana
 
       if response && (response.status_code == 200)
         data = JSON.parse(response.body)
-        @process[:report_pid] = data["pid"].to_s
+        @process.report_pid = data["pid"].as_i
         @@agent_uuid = data["agentUuid"].to_s
         true
       else
@@ -239,23 +245,17 @@ module Instana
     # @return [Bool] true on success, false otherwise
     #
     def report_metrics(payload)
-      if @discovered.has_run
+      if !@discovered.has_run
         ::Instana.logger.debug("report_metrics called but discovery hasn't run yet!")
         return false
       end
 
-      path = "com.instana.plugin.crystal.#{@process[:report_pid]}"
+      path = "com.instana.plugin.crystal.#{@process.report_pid}"
       uri = URI.parse("http://#{@discovered.host}:#{@discovered.port}/#{path}")
 
       response = make_host_agent_request(uri, payload.to_json, :post)
 
       if response
-        if response.body && response.body.size > 2
-          # The host agent returned something indicating that is has a request for us that we
-          # need to process.
-          handle_response(response.body)
-        end
-
         if response.status_code == 200
           @entity_last_seen = Time.now
           return true
@@ -265,32 +265,6 @@ module Instana
     rescue e
       Instana.logger.error "report_metrics:#{File.basename(__FILE__)}:#{__LINE__}: #{e.message}"
       Instana.logger.debug e.backtrace.join("\r\n")
-    end
-
-    # When a request is received by the host agent, it is sent here
-    # from processing and response.
-    #
-    # @param json_string [String] the request from the host agent
-    #
-    def handle_response(json_string)
-      return
-      # FIXME
-      # their_request = JSON.parse(json_string).first
-      #
-      # if their_request["action"]?
-      #   if their_request["action"] == "crystal.source"
-      #     payload = ::Instana::Util.get_cr_source(their_request["args"]["file"])
-      #   else
-      #     payload = {:error => "Unrecognized action: #{their_request["action"]}. An newer Instana shard may be required for this. Current version: #{::Instana::VERSION}"}
-      #   end
-      # else
-      #   payload = {:error => "Instana Crystal: No action specified in request."}
-      # end
-      #
-      # path = "com.instana.plugin.crystal/response.#{@process[:report_pid]}?messageId=#{URI.encode(their_request["messageId"])}"
-      # uri = URI.parse("http://#{@discovered.host}:#{@discovered.port}/#{path}")
-      # ::Instana.logger.debug_response "Responding to agent: #{payload.inspect}"
-      # make_host_agent_request(uri, payload.to_json, :post)
     end
 
     # Accept and report spans to the host agent.
@@ -306,7 +280,7 @@ module Instana
         return false
       end
 
-      path = "com.instana.plugin.crystal/traces.#{@process[:report_pid]}"
+      path = "com.instana.plugin.crystal/traces.#{@process.report_pid}"
       uri = URI.parse("http://#{@discovered.host}:#{@discovered.port}/#{path}")
       response = make_host_agent_request(uri, spans.to_json, :post)
 
@@ -393,7 +367,7 @@ module Instana
     # Returns the PID that we are reporting to
     #
     def report_pid
-      @process[:report_pid]
+      @process.report_pid
     end
 
     # Indicates if the agent is ready to send metrics
@@ -435,7 +409,7 @@ module Instana
       else
         ::Instana.logger.warn "Uknown agent state: #{state}"
       end
-      ::Instana.metrics.reset_timer!
+      ::Instana.metrics.reset!
       true
     end
 
@@ -449,7 +423,7 @@ module Instana
     protected def make_host_agent_request(uri, body, method)
       # FIXME: open timeout, read timeout? dns timeout?
       h = HTTP::Headers{"Accept" => MIME_JSON, "Content-Type" => MIME_JSON}
-      response = HTTP::Client.exec(method.to_s, url: uri, headers: h, body: body)
+      response = HTTP::Client.exec(method.to_s.upcase, url: uri, headers: h, body: body)
 
       # FIXME
       # rescue e : Errno::ECONNREFUSED
@@ -468,7 +442,7 @@ module Instana
     #
     protected def pid_namespace?
       return false unless @has_procfs
-      Process.pid != get_real_pid
+      ::Process.pid != get_real_pid
     end
 
     # Attempts to determine the true process ID by querying the
@@ -477,8 +451,8 @@ module Instana
     protected def get_real_pid
       raise Exception.new("Unsupported platform: get_real_pid") unless @has_procfs
 
-      sched_file = "/proc/#{Process.pid}/sched"
-      pid = Process.pid
+      sched_file = "/proc/#{::Process.pid}/sched"
+      pid = ::Process.pid
 
       if File.exists?(sched_file)
         v = File.read_lines(sched_file)
@@ -492,7 +466,7 @@ module Instana
     # @ return [Bool] true or false to indicate if forked
     #
     protected def forked?
-      @process[:pid] != Process.pid
+      @process.pid != ::Process.pid
     end
   end
 end

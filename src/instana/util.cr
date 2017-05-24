@@ -59,37 +59,12 @@ module Instana
       return {:error => e.inspect}
     end
 
-    # Method to collect up process info for snapshots.  This
-    # is generally used once per process.
-    #
-    def self.take_snapshot
-      data = {:sensorVersion => ::Instana::VERSION,
-              # FIXME
-              :crystal_version => "0.22"}
-
-      # Report Bundle
-      # FIXME Convert to shard list
-      # if defined?(::Gem) && Gem.respond_to?(:loaded_specs)
-      #   data[:versions] = {String => String}
-      #
-      #   Gem.loaded_specs.each do |k, v|
-      #     data[:versions][k] = v.version.to_s
-      #   end
-      # end
-
-      data
-    rescue e
-      ::Instana.logger.error "take_snapshot:#{File.basename(__FILE__)}:#{__LINE__}: #{e.message}"
-      ::Instana.logger.debug e.backtrace.join("\r\n")
-      return data
-    end
-
     # Used in class initialization and after a fork, this method
     # collects up process information
     #
     def self.collect_process_info
-      process = {} of Symbol => String | Int32 | Array(String) | Nil
-      cmdline_file = "/proc/#{Process.pid}/cmdline"
+      process = ::Instana::ProcessEntity.new
+      cmdline_file = "/proc/#{::Process.pid}/cmdline"
 
       # If there is a /proc filesystem, we read this manually so
       # we can split on embedded null bytes.  Otherwise (e.g. OSX, Windows)
@@ -103,13 +78,13 @@ module Instana
       end
 
       cmdline.each { |e| cmdline.delete(e) if e.includes?('=') }
-      process[:name] = cmdline.shift
-      process[:arguments] = cmdline
+      process.name = cmdline.shift
+      process.arguments = cmdline
 
-      process[:pid] = Process.pid
+      process.pid = ::Process.pid
       # This is usually Process.pid but in the case of containers, the host agent
       # will return to us the true host pid in which we use to report data.
-      process[:report_pid] = nil
+      process.report_pid = nil
       process
     end
 

@@ -1,19 +1,13 @@
 require "./base"
 require "./config"
 require "./agent"
-require "./collector"
+require "./metrics"
 require "./tracer"
 require "./tracing/processor"
 require "./instrumentation"
 
 ::Instana.setup
 ::Instana.agent.setup
-
-# Register the metric collectors
-# TODO Implement crystal collectors
-# require "./collectors/gc"
-# require "./collectors/memory"
-# require "./collectors/thread"
 
 # Require supported OpenTracing interfaces
 require "../opentracing"
