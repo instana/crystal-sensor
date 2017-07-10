@@ -1,3 +1,7 @@
+<div align="center">
+<img src="https://user-images.githubusercontent.com/395132/28031672-5145e9d8-65a8-11e7-8d40-8fcfcc0166e7.png"/>
+</div>
+
 # Instana
 
 The instana package provides Crystal metrics and traces (request, queue & cross-host) for [Instana](https://www.instana.com/).
