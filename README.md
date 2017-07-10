@@ -1,8 +1,10 @@
-# instana
+# Instana
 
-The Instana shard provides Crystal metrics and tracing for [Instana](https://www.instana.com/).
+The instana package provides Crystal metrics and traces (request, queue & cross-host) for [Instana](https://www.instana.com/).
 
 Any and all feedback is welcome.  Happy Crystal visibility.
+
+Note: _This package is currently in BETA._
 
 ## Installation
 
@@ -20,15 +22,21 @@ dependencies:
 require "instana"
 ```
 
+## Tracing
+
+This Crystal shard supports [OpenTracing](http://opentracing.io/).
+
+## Documentation
+
+You can find more documentation covering supported components and minimum versions in the Instana [documentation portal](https://instana.atlassian.net/wiki/display/DOCS/Crystal).
+
 ## Contributing
 
-1. Fork it ( https://github.com/instana/crystal-sensor/fork )
-2. Create your feature branch (git checkout -b my-new-feature)
-3. Commit your changes (git commit -am 'Add some feature')
-4. Push to the branch (git push origin my-new-feature)
-5. Create a new Pull Request
-
 Bug reports and pull requests are welcome on GitHub at https://github.com/instana/crystal-sensor.
+
+## More
+
+Want to instrument other languages?  See our [Nodejs](https://github.com/instana/nodejs-sensor), [Go](https://github.com/instana/golang-sensor), [Ruby](https://github.com/instana/ruby-sensor), [Python](https://github.com/instana/python-sensor) instrumentation and [many other supported languages & technologies](https://www.instana.com/supported-technologies/).
 
 ## Contributors
 
