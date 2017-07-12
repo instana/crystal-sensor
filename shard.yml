@@ -12,3 +12,9 @@ dependencies:
   quartz:
     github: andrewhamon/quartz
     version: ~> 0.1.1
+  icr:
+    github: greyblake/crystal-icr
+    branch: master
+  any_hash:
+    github: sija/any_hash.cr
+    version: ~> 0.2.0

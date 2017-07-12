@@ -1,3 +1,5 @@
+require "any_hash"
+
 module Instana
   class Span
     REGISTERED_SPANS = [] of Symbol
@@ -5,26 +7,24 @@ module Instana
     EXIT_SPANS       = [] of Symbol
     HTTP_SPANS       = ENTRY_SPANS + EXIT_SPANS
 
-    alias JSONSpan = Hash(Symbol, String | Int64 | Symbol)
+    property parent : ::Instana::Span | Nil
+    property baggage : AnyHash::JSON | Nil
 
-    property :parent
-    property :baggage
-
-    def initialize(name, trace_id, parent_id = nil, start_time = Time.now)
-      @data = JSONSpan.new
+    def initialize(name : Symbol, trace_id, parent_id = nil, start_time = Time.now)
+      @data = AnyHash::JSON.new
       @data[:t] = trace_id                    # Trace ID
       @data[:s] = ::Instana::Util.generate_id # Span ID
       @data[:p] = parent_id if parent_id      # Parent ID
       @data[:ta] = :crystal                   # Agent
-      @data[:data] = Hash{Symbol, String}
 
       # Entity Source
       @data[:f] = {:e => ::Instana.agent.report_pid,
                    :h => ::Instana.agent.agent_uuid}
       # Start time
-      @data[:ts] = ::Instana::Util.time_to_ms(start_time)
+      @data[:ts] = start_time.epoch_ms
 
-      @baggage = Hash(Symbol, String)
+      @parent = nil
+      @baggage = nil
 
       # For entry spans, add a backtrace fingerprint
       add_stack(limit: 2) if ENTRY_SPANS.includes?(name)
@@ -33,8 +33,8 @@ module Instana
       add_stack if EXIT_SPANS.includes?(name)
 
       # Check for custom tracing
-      if REGISTERED_SPANS.includes?(name.to_sym)
-        @data[:n] = name.to_sym
+      if REGISTERED_SPANS.includes?(name)
+        @data[:n] = name
       else
         configure_custom(name)
       end
@@ -44,26 +44,23 @@ module Instana
     #
     # @param limit [Integer] Limit the backtrace to the top <limit> frames
     #
-    def add_stack(limit = nil, stack = Kernel.caller)
+    def add_stack(limit = nil, stack = CallStack.new.printable_backtrace)
       frame_count = 0
-      @data[:stack] = [] of String
+      @data[:stack] = [] of AnyHash::JSON
 
       stack.each do |i|
-        # If the stack has the full instana shard version in it's path
-        # then don't include that frame. Also don't exclude the Rack module.
-        if !i.match(/instana\/instrumentation\/rack.rb/).nil? ||
-           (i.match(::Instana::VERSION_FULL).nil? && i.match("lib/instana/").nil?)
-          break if limit && frame_count >= limit
+        break if limit && frame_count >= limit
 
-          x = i.split(":")
+        x = i.split(" ")
 
-          @data[:stack] << {
+        if x.size == 4
+          @data[:stack] = AnyHash::JSON.new({
             :f => x[0],
-            :n => x[1],
-            :m => x[2],
-          }
-          frame_count = frame_count + 1 if limit
+            :n => x[3],
+            :m => x[1],
+          })
         end
+        frame_count = frame_count + 1 if limit
       end
     end
 
@@ -108,9 +105,12 @@ module Instana
     # @param name [String] name of the span
     # @param kvs [Hash] list of key values to be reported in the span
     #
-    def configure_custom(name)
+    def configure_custom(name : Symbol)
       @data[:n] = :sdk
-      @data[:data] = {:sdk => {:name => name.to_sym}}
+      @data[:data] = AnyHash::JSON.new({:sdk => {
+        :name   => name,
+        :custom => AnyHash::JSON.new,
+      }})
       self
     end
 
@@ -122,11 +122,8 @@ module Instana
     # @return [Span]
     #
     def close(end_time = Time.now)
-      unless end_time.is_a?(Time)
-        ::Instana.logger.debug "span.close: Passed #{end_time.class} instead of Time class"
-      end
-
-      @data[:d] = (::Instana::Util.time_to_ms(end_time) - @data[:ts])
+      duration = end_time.epoch_ms - @data[:ts].as(Int64)
+      @data[:d] = duration
       self
     end
 
@@ -175,7 +172,7 @@ module Instana
     # @return [String] or [Symbol] representing the span name
     def name
       if custom?
-        @data[:data][:sdk][:name]
+        @data[:data, :sdk, :name]
       else
         @data[:n]
       end
@@ -187,7 +184,7 @@ module Instana
     #
     def name=(n)
       if custom?
-        @data[:data][:sdk][:name] = n
+        @data[:data, :sdk, :name] = n
       else
         @data[:n] = n
       end
@@ -211,14 +208,14 @@ module Instana
 
     # Hash accessor to the internal @data hash
     #
-    def [](key)
-      @data[key.to_sym]
+    def [](key : Symbol)
+      @data[key]
     end
 
     # Hash setter to the internal @data hash
     #
-    def []=(key, value)
-      @data[key.to_sym] = value
+    def []=(key : Symbol, value)
+      @data[key] = value
     end
 
     # Hash key query to the internal @data hash
@@ -254,30 +251,29 @@ module Instana
     # Set a tag value on this span
     # Spec: OpenTracing API
     #
-    # @param key [String] the key of the tag
+    # @param key [Symbol] the key of the tag
     # @param value [String, Numeric, Bool] the value of the tag. If it's not
     # a String, Numeric, or Bool it will be encoded with to_s
     #
-    def set_tag(key, value)
+    def set_tag(key : Symbol, value)
       if custom?
-        @data[:data][:sdk][:custom] ||= {key, value}
-        @data[:data][:sdk][:custom][key] = value
+        @data[:data, :sdk, :custom, key] = value
 
-        if key.to_sym == :"span.kind"
-          case value.to_sym
+        if key == :"span.kind"
+          case value
           when :server || :consumer
-            @data[:data][:sdk][:type] = :entry
+            @data[:data, :sdk, :type] = :entry
           when :client || :producer
-            @data[:data][:sdk][:type] = :exit
+            @data[:data, :sdk, :type] = :exit
           end
         end
       else
-        if !@data[:data][key]?
-          @data[:data][key] = value
-        elsif value.is_a?(Hash) && self[:data][key].is_a?(Hash)
-          @data[:data][key].merge!(value)
+        if !@data[:data, key]?
+          @data[:data, key] = value
+        elsif value.is_a?(Hash) && @data[:data, key].is_a?(Hash)
+          @data[:data, key].merge!(value)
         else
-          @data[:data][key] = value
+          @data[:data, key] = value
         end
       end
       self
@@ -331,9 +327,9 @@ module Instana
     #
     def tags(key = nil)
       if custom?
-        tags = @data[:data][:sdk][:custom]
+        tags = @data[:data, :sdk, :custom]
       else
-        tags = @data[:data][key]
+        tags = @data[:data, key]
       end
       key ? tags[key] : tags
     end
@@ -361,7 +357,7 @@ module Instana
       end
 
       if ::Instana.tracer.current_span.id != id
-        ::Instana.logger.tracing "Closing a span that isn't active. This will result in a broken trace: #{self.inspect}"
+        ::Instana.logger.debug "Closing a span that isn't active. This will result in a broken trace: #{self.inspect}"
       end
 
       if is_root?

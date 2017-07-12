@@ -77,6 +77,7 @@ module Instana
     #   - Prevent another run of the timer while this is running
     #
     def send
+      ::Instana.logger.error "Processor! bitch!: #{@queue.size}"
       return if @queue.empty? || ENV["INSTANA_SHARD_TEST"]?
 
       size = @queue.size
@@ -103,7 +104,7 @@ module Instana
     # @return [Array] An array of [Span] or empty
     #
     def queued_spans
-      spans = [] of ::Instana::Span::JSONSpan
+      spans = [] of AnyHash::JSON
 
       if !@queue.empty?
         until @queue.empty?

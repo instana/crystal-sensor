@@ -93,7 +93,7 @@ module Instana
     # @return [Integer] the current time in milliseconds
     #
     def self.ts_now
-      (Time.now.to_f * 1000).floor
+      Time.now.epoch_ms
     end
 
     # Convert a Time value to milliseconds
@@ -101,7 +101,7 @@ module Instana
     # @param time [Time]
     #
     def self.time_to_ms(time = Time.now)
-      (time.to_f * 1000).floor
+      time.epoch_ms
     end
 
     # Generate a random 64bit ID
@@ -109,8 +109,10 @@ module Instana
     # @return [Integer] a random 64bit integer
     #
     def self.generate_id
-      # Max value is 9223372036854775807 (signed long in Java)
-      rand(-2**63..2**63 - 1)
+      # Trace IDs (and Span IDs) are based on Java Signed Long datatype that
+      # has the following range:
+      # -9223372036854775808 to 9223372036854775807
+      Random.new.rand(Int64::MIN..Int64::MAX)
     end
 
     # Convert an ID to a value appropriate to pass in a header.

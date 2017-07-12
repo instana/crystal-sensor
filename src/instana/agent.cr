@@ -27,7 +27,7 @@ module Instana
 
   class Agent
     property :state
-    property :agent_uuid
+    property agent_uuid : String
     property process : ProcessEntity
 
     LOCALHOST      = "127.0.0.1"
@@ -35,7 +35,6 @@ module Instana
     DISCOVERY_PATH = "com.instana.plugin.crystal.discovery"
 
     @default_gateway : String | Nil
-    @@agent_uuid : String | Nil
 
     def initialize
       # Supported two states (unannounced & announced)
@@ -72,8 +71,7 @@ module Instana
       @discovered = Discovered.new
 
       # The agent UUID returned from the host agent
-      # Nil by default
-      # @@agent_uuid = nil
+      @agent_uuid = ""
 
       # Collect process information
       @process = ::Instana::Util.collect_process_info
@@ -85,9 +83,10 @@ module Instana
     def after_fork
       ::Instana.logger.debug "after_fork hook called. Falling back to unannounced state and spawning a new background agent thread."
 
+      # FIXME
       # Reseed the random number generator for this
       # new thread.
-      srand
+      # srand
 
       # Re-collect process information post fork
       @process = ::Instana::Util.collect_process_info
@@ -224,7 +223,7 @@ module Instana
       if response && (response.status_code == 200)
         data = JSON.parse(response.body)
         @process.report_pid = data["pid"].as_i
-        @@agent_uuid = data["agentUuid"].to_s
+        @agent_uuid = data["agentUuid"].to_s
         true
       else
         false
@@ -275,7 +274,7 @@ module Instana
     def report_spans(spans)
       return unless @state == :announced
 
-      if @discovered.has_run
+      if !@discovered.has_run
         ::Instana.logger.debug("report_spans called but discovery hasn't run yet!")
         return false
       end
@@ -375,7 +374,7 @@ module Instana
     #
     def ready?
       # In test, we"re always ready :-)
-      return true if ENV["INSTANA_SHARD_TEST"]
+      return true if ENV["INSTANA_SHARD_TEST"]?
 
       if forked?
         ::Instana.logger.debug "Instana: detected fork.  Calling after_fork"
