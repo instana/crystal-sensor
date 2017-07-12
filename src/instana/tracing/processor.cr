@@ -77,7 +77,6 @@ module Instana
     #   - Prevent another run of the timer while this is running
     #
     def send
-      ::Instana.logger.error "Processor! bitch!: #{@queue.size}"
       return if @queue.empty? || ENV["INSTANA_SHARD_TEST"]?
 
       size = @queue.size
