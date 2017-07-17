@@ -10,7 +10,6 @@ module Instana
       )
 
       def initialize
-        ::GC.enable
       end
 
       ##
