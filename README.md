@@ -10,6 +10,8 @@ Any and all feedback is welcome.  Happy Crystal visibility.
 
 Note: _This package is currently in BETA._
 
+[![OpenTracing Badge](https://img.shields.io/badge/OpenTracing-enabled-blue.svg)](http://opentracing.io)
+
 ## Installation
 
 Add this to your application's `shard.yml`:
