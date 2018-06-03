@@ -4,7 +4,7 @@
 
 # Instana
 
-The instana package provides Crystal metrics and traces (request, queue & cross-host) for [Instana](https://www.instana.com/).
+The instana package collects Crystal metrics and distributed traces for [Instana](https://www.instana.com/).
 
 Any and all feedback is welcome.  Happy Crystal visibility.
 
