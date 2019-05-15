@@ -9,7 +9,7 @@ module Instana
       super(*args)
       if ENV["INSTANA_SHARD_TEST"]?
         self.level = Logger::DEBUG
-      elsif ENV["INSTANA_SHARD_DEV"]?
+      elsif ENV["INSTANA_DEBUG"]?
         self.level = Logger::DEBUG
       else
         self.level = Logger::WARN
